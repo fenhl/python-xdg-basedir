@@ -1,4 +1,3 @@
-python-xdg-basedir
-==================
+**python-xdg-basedir** is an implementation of the [XDG Base Directory](http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html) specification in Python.
 
-An implementation of the XDG Base Directory specification in Python
+This is `python-xdg-basedir` version 0.1.0 ([semver](http://semver.org/)).
