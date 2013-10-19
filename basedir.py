@@ -1,9 +1,11 @@
 import os
 import os.path
 
+__version__ = '0.2.0'
+
 class _basedirfile:
     def __enter__(self):
-        self.fobj = open(self.path, flags)
+        self.fobj = open(self.path, self.flags)
         return self.fobj
     
     def __exit__(self, exc_type, exc_value, traceback):
