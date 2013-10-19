@@ -1,11 +1,12 @@
+import json
 import os
 import os.path
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 class _basedirfile:
     def __enter__(self):
-        self.fobj = open(self.path, self.flags)
+        self.fobj = open(path, self.flags)
         return self.fobj
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -19,16 +20,58 @@ class _basedirfile:
                 pass
             return False
     
-    def __init__(self, path, flags='r'):
-        self.path = path
+    def __init__(self, paths, filename, flags='r'):
+        self.paths = paths
+        for path in self.paths:
+            if os.path.exists(os.path.join(path, filename)):
+                self.path = path
+                break
+        else:
+            self.path = None
+        self.filename = filename
         self.flags = 'r'
     
     def __str__(self):
-        return self.path
+        return ':'.join(os.path.join(path, self.filename) for path in self.paths)
+    
+    def json(self):
+        def _patch_json(base, new):
+            new_json = json.load(new)
+            if type(new_json) is dict:
+                if type(base) is not dict:
+                    return new_json
+                base.update(new_json)
+                return base
+            elif type(new_json) is list:
+                if type(base) is not list:
+                    return new_json
+                return base + new_json
+            else:
+                return new_json
+        
+        return self.read(patch=_patch_json)
+    
+    def read(self, patch=None):
+        """If patch is None (the default), this returns the contents of the first found file.
+        
+        If patch is not None, it must be a function of the form patch(base, new). This function will then read all existing files in reverse order, and call the patch function with the results of the last call (or None for the first call) as the first argument, and a file object representing the current file as the second argument. The end result is returned.
+        """
+        if patch is None:
+            for path in self.paths:
+                if os.path.exists(os.path.join(path, self.filename)):
+                    with open(os.path.join(path, self.filename)) as f:
+                        return f.read()
+        else:
+            base = None
+            for path in reversed(self.paths):
+                if os.path.exists(os.path.join(path, self.filename)):
+                    with open(os.path.join(path, self.filename)) as new:
+                        base = patch(base, new)
+            return base
 
 class _basedir:
     def __call__(self, filename, flags='r'):
-        return _basedirfile(os.path.join(self.path, filename), flags=flags)
+        return _basedirfile([self.path], filename, flags=flags)
     
     def __init__(self, envar, default):
         dir = os.environ.get(envar)
@@ -39,11 +82,7 @@ class _basedir:
 
 class _basedirs:
     def __call__(self, filename, flags='r'):
-        for dir in self:
-            if os.path.exists(os.path.join(dir, filename)):
-                return _basedirfile(os.path.join(dir, filename), flags=flags)
-        else:
-            raise IOError('file not found')
+        return _basedirfile(self.paths, filename, flags=flags)
     
     def __init__(self, envar, default, home):
         self.home = home
