@@ -1,7 +1,7 @@
 import os
 import os.path
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 class _basedirfile:
     def __enter__(self):
@@ -13,6 +13,10 @@ class _basedirfile:
             self.fobj.close()
             self.fobj = None
         else:
+            try:
+                self.fobj.close()
+            finally:
+                pass
             return False
     
     def __init__(self, path, flags='r'):
