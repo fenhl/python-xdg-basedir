@@ -2,7 +2,7 @@ import json
 import os
 import os.path
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 class _basedirfile:
     def __enter__(self):
@@ -34,7 +34,7 @@ class _basedirfile:
     def __str__(self):
         return ':'.join(os.path.join(path, self.filename) for path in self.paths)
     
-    def json(self):
+    def json(self, base=None):
         def _patch_json(base, new):
             new_json = json.load(new)
             if type(new_json) is dict:
@@ -49,12 +49,12 @@ class _basedirfile:
             else:
                 return new_json
         
-        return self.read(patch=_patch_json)
+        return self.read(patch=_patch_json, base=base)
     
-    def read(self, patch=None):
+    def read(self, patch=None, base=None):
         """If patch is None (the default), this returns the contents of the first found file.
         
-        If patch is not None, it must be a function of the form patch(base, new). This function will then read all existing files in reverse order, and call the patch function with the results of the last call (or None for the first call) as the first argument, and a file object representing the current file as the second argument. The end result is returned.
+        If patch is not None, it must be a function of the form patch(base, new). This function will then read all existing files in reverse order, and call the patch function with the results of the last call as the first argument, and a file object representing the current file as the second argument. The end result is returned.
         """
         if patch is None:
             for path in self.paths:
@@ -62,7 +62,6 @@ class _basedirfile:
                     with open(os.path.join(path, self.filename)) as f:
                         return f.read()
         else:
-            base = None
             for path in reversed(self.paths):
                 if os.path.exists(os.path.join(path, self.filename)):
                     with open(os.path.join(path, self.filename)) as new:
