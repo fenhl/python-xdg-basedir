@@ -4,9 +4,40 @@ import os.path
 
 __version__ = '0.5.0'
 
-class _basedirfile:
+try:
+    import lazyjson
+except ImportError:
+    pass
+else:
+    class Config(lazyjson.File):
+        def __init__(self, basedir_file):
+            self.basedir_file = basedir_file
+            self.file_info = os.path.join(self.basedir_file.path, self.basedir_file.filename)
+        
+        def value_at_key_path(self, key_path):
+            found = False
+            ret = None
+            for json_path in reversed(self.basedir_file):
+                with open(json_path) as json_file:
+                    item = json.load(json_file)
+                for key in key_path:
+                    try:
+                        item = item[key]
+                    except (IndexError, KeyError):
+                        break
+                else:
+                    found = True
+                    if if all(isinstance(key, str) for key in key_path) and isinstance(ret, dict) and isinstance(item, dict):
+                        ret.update(item)
+                    else:
+                        ret = item
+            if not found:
+                raise KeyError()
+            return ret
+
+class BaseDirFile:
     def __enter__(self):
-        self.fobj = open(path, self.flags)
+        self.fobj = open(os.path.join(self.path, self.filename), self.flags)
         return self.fobj
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -31,8 +62,29 @@ class _basedirfile:
         self.filename = filename
         self.flags = 'r'
     
+    def __iter__(self):
+        for path in self.paths:
+            yield os.path.join(path, self.filename)
+    
     def __str__(self):
         return ':'.join(os.path.join(path, self.filename) for path in self.paths)
+    
+    def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False):
+        import lazyjson
+        for path in self.paths:
+            if existing_only and not os.path.exists(os.path.join(path, self.filename)):
+                continue
+            if readable_only:
+                try:
+                    open(os.path.join(path, self.filename)).close()
+                except IOError:
+                    continue
+            if writeable_only:
+                try:
+                    open(os.path.join(path, self.filename), 'a').close()
+                except IOError:
+                    continue
+            return lazyjson.File(os.path.join(path, self.filename))
     
     def json(self, base=None):
         def _patch_json(base, new):
@@ -68,9 +120,9 @@ class _basedirfile:
                         base = patch(base, new)
             return base
 
-class _basedir:
+class BaseDir:
     def __call__(self, filename, flags='r'):
-        return _basedirfile([self.path], filename, flags=flags)
+        return BaseDirFile([self.path], filename, flags=flags)
     
     def __init__(self, envar, default):
         dir = os.environ.get(envar)
@@ -78,10 +130,13 @@ class _basedir:
     
     def __str__(self):
         return self.path
+    
+    def config(self, filename):
+        return Config(self(filename))
 
-class _basedirs:
+class BaseDirs:
     def __call__(self, filename, flags='r'):
-        return _basedirfile(self.paths, filename, flags=flags)
+        return BaseDirFile(self.paths, filename, flags=flags)
     
     def __init__(self, envar, default, home):
         self.home = home
@@ -95,8 +150,11 @@ class _basedirs:
     def __str__(self, include_home=False):
         paths = ([str(self.home)] if include_home else []) + list(self.paths)
         return ':'.join(paths)
+    
+    def config(self, filename):
+        return Config(self(filename))
 
-data_home = _basedir('XDG_DATA_HOME', os.path.join(os.environ['HOME'], '.local/share'))
-config_home = _basedir('XDG_CONFIG_HOME', os.path.join(os.environ['HOME'], '.config'))
-data_dirs = _basedirs('XDG_DATA_DIRS', ['/usr/local/share', '/usr/share'], data_home)
-config_dirs = _basedirs('XDG_CONFIG_DIRS', ['/etc/xdg'], config_home)
+data_home = BaseDir('XDG_DATA_HOME', os.path.join(os.environ['HOME'], '.local/share'))
+config_home = BaseDir('XDG_CONFIG_HOME', os.path.join(os.environ['HOME'], '.config'))
+data_dirs = BaseDirs('XDG_DATA_DIRS', ['/usr/local/share', '/usr/share'], data_home)
+config_dirs = BaseDirs('XDG_CONFIG_DIRS', ['/etc/xdg'], config_home)
