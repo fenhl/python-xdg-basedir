@@ -2,7 +2,7 @@ import json
 import os
 import os.path
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 try:
     import lazyjson
@@ -27,10 +27,10 @@ else:
                         break
                 else:
                     found = True
-                    if if all(isinstance(key, str) for key in key_path) and isinstance(ret, dict) and isinstance(item, dict):
+                    if all(isinstance(key, str) for key in key_path) and isinstance(ret, dict) and isinstance(item, dict):
                         ret.update(item)
                     else:
-                        ret = item
+                        ret = item
             if not found:
                 raise KeyError()
             return ret
