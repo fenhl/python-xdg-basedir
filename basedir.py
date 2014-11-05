@@ -4,37 +4,6 @@ import os.path
 
 __version__ = '0.6.0'
 
-try:
-    import lazyjson
-except ImportError:
-    pass
-else:
-    class Config(lazyjson.File):
-        def __init__(self, basedir_file):
-            self.basedir_file = basedir_file
-            self.file_info = os.path.join(self.basedir_file.path, self.basedir_file.filename)
-        
-        def value_at_key_path(self, key_path):
-            found = False
-            ret = None
-            for json_path in reversed(self.basedir_file):
-                with open(json_path) as json_file:
-                    item = json.load(json_file)
-                for key in key_path:
-                    try:
-                        item = item[key]
-                    except (IndexError, KeyError):
-                        break
-                else:
-                    found = True
-                    if all(isinstance(key, str) for key in key_path) and isinstance(ret, dict) and isinstance(item, dict):
-                        ret.update(item)
-                    else:
-                        ret = item
-            if not found:
-                raise KeyError()
-            return ret
-
 class BaseDirFile:
     def __enter__(self):
         self.fobj = open(os.path.join(self.path, self.filename), self.flags)
@@ -69,8 +38,24 @@ class BaseDirFile:
     def __str__(self):
         return ':'.join(os.path.join(path, self.filename) for path in self.paths)
     
-    def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False):
+    def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False, default=None):
+        """Return a lazyjson object representing the file(s). Requires the lazyjson module.
+        
+        Optional arguments:
+        existing_only -- If true, exclude files from the multifile which don't exist at the time of the call. Defaults to False.
+        readable_only -- If true, exclude files from the multifile for which opening in read mode fails at the time of the call. Defaults to False.
+        writeable_only -- If true, exclude files from the multifile for which opening in write mode fails at the time of the call. Defaults to False.
+        default -- A JSON-encodable Python object which is appended to the end of the multifile as a lazyjson.PythonFile, and can be used to provide default values for config files. Defaults to None.
+        
+        Returns:
+        A lazyjson.MultiFile created from the paths of this file.
+        
+        Raises:
+        ImportError for lazyjson.
+        """
         import lazyjson
+        
+        paths = []
         for path in self.paths:
             if existing_only and not os.path.exists(os.path.join(path, self.filename)):
                 continue
@@ -84,7 +69,9 @@ class BaseDirFile:
                     open(os.path.join(path, self.filename), 'a').close()
                 except IOError:
                     continue
-            return lazyjson.File(os.path.join(path, self.filename))
+            paths.append(os.path.join(path, self.filename))
+        paths.append(lazyjson.PythonFile(default))
+        return lazyjson.MultiFile(*paths)
     
     def json(self, base=None):
         def _patch_json(base, new):
@@ -125,8 +112,7 @@ class BaseDir:
         return BaseDirFile([self.path], filename, flags=flags)
     
     def __init__(self, envar, default):
-        dir = os.environ.get(envar)
-        self.path = default if dir is None or dir == '' else dir
+        self.path = os.environ.get(envar) or dir
     
     def __str__(self):
         return self.path
@@ -140,8 +126,7 @@ class BaseDirs:
     
     def __init__(self, envar, default, home):
         self.home = home
-        dirs_envar = os.environ.get(envar)
-        self.paths = default if dirs_envar is None or dirs_envar == '' else ':'.split(dirs_envar)
+        self.paths = os.environ.get(envar) or ':'.split(dirs_envar)
     
     def __iter__(self):
         yield str(self.home)
