@@ -143,3 +143,4 @@ data_home = BaseDir('XDG_DATA_HOME', os.path.join(os.environ['HOME'], '.local/sh
 config_home = BaseDir('XDG_CONFIG_HOME', os.path.join(os.environ['HOME'], '.config'))
 data_dirs = BaseDirs('XDG_DATA_DIRS', ['/usr/local/share', '/usr/share'], data_home)
 config_dirs = BaseDirs('XDG_CONFIG_DIRS', ['/etc/xdg'], config_home)
+cache_home = BaseDir('XDG_CACHE_HOME', os.path.join(os.environ['HOME'], '.cache'))
