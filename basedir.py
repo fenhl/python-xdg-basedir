@@ -112,7 +112,7 @@ class BaseDir:
         return BaseDirFile([self.path], filename, flags=flags)
     
     def __init__(self, envar, default):
-        self.path = os.environ.get(envar) or dir
+        self.path = os.environ.get(envar) or default
     
     def __str__(self):
         return self.path
@@ -122,11 +122,11 @@ class BaseDir:
 
 class BaseDirs:
     def __call__(self, filename, flags='r'):
-        return BaseDirFile(self.paths, filename, flags=flags)
+        return BaseDirFile([self.home] + self.paths, filename, flags=flags)
     
     def __init__(self, envar, default, home):
         self.home = home
-        self.paths = os.environ.get(envar) or ':'.split(dirs_envar)
+        self.paths = os.environ.get(envar).split(':') or default
     
     def __iter__(self):
         yield str(self.home)
