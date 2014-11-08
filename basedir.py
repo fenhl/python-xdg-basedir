@@ -147,7 +147,10 @@ class BaseDirs:
         return BaseDirFile([self.home] + self.paths, filename, flags=flags)
     
     def __init__(self, envar, default, home):
-        self.home = home
+        if isinstance(home, BaseDir):
+            self.home = home.path
+        else:
+            self.home = home
         self.paths = os.environ.get(envar, '').split(':') or default
     
     def __iter__(self):
