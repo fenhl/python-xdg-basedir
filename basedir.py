@@ -157,7 +157,8 @@ class BaseDirs:
     
     def __iter__(self):
         yield str(self.home)
-        yield from self.paths
+        for path in self.paths:
+            yield path
     
     def __str__(self, include_home=False):
         paths = ([str(self.home)] if include_home else []) + list(self.paths)
