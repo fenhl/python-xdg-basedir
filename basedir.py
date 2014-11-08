@@ -147,7 +147,7 @@ class BaseDirs:
     
     def __init__(self, envar, default, home):
         self.home = home
-        self.paths = os.environ.get(envar).split(':') or default
+        self.paths = os.environ.get(envar, '').split(':') or default
     
     def __iter__(self):
         yield str(self.home)
