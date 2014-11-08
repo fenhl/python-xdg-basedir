@@ -1,6 +1,7 @@
 import json
 import os
 import os.path
+import subprocess
 
 def parse_version_string():
     path = os.path.abspath(__file__)
