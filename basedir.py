@@ -1,26 +1,22 @@
 import json
 import os
 import os.path
+import pathlib
 import subprocess
 
 def parse_version_string():
-    path = os.path.abspath(__file__)
-    while os.path.islink(path):
-        path = os.path.join(os.path.dirname(path), os.readlink(path))
-    path = os.path.dirname(path) # go up one level, from repo/basedir.py to repo, where README.md is located
-    while os.path.islink(path):
-        path = os.path.join(os.path.dirname(path), os.readlink(path))
+    path = pathlib.Path(__file__).resolve().parent # go up one level, from repo/basedir.py to repo, where README.md is located
     try:
-        version = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=path).decode('utf-8').strip('\n')
+        version = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
         if version == 'master':
             try:
-                with open(os.path.join(path, 'README.md')) as readme:
+                with (path / 'README.md').open() as readme:
                     for line in readme.read().splitlines():
-                        if line.startswith('This is `python-xdg-basedir` version'):
+                        if line.startswith('This is `python-xdg-basedir` version '):
                             return line.split(' ')[4]
             except:
                 pass
-        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=path).decode('utf-8').strip('\n')
+        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=str(path)).decode('utf-8').strip('\n')
     except:
         pass
 
@@ -28,9 +24,9 @@ __version__ = parse_version_string()
 
 class BaseDirFile:
     def __enter__(self):
-        self.fobj = open(os.path.join(self.path, self.filename), self.flags)
+        self.fobj = (self.path / self.filename).open(self.flags)
         return self.fobj
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
             self.fobj.close()
@@ -41,60 +37,60 @@ class BaseDirFile:
             finally:
                 pass
             return False
-    
+
     def __init__(self, paths, filename, flags='r'):
-        self.paths = paths
+        self.paths = [pathlib.Path(p) for p in paths]
         for path in self.paths:
-            if os.path.exists(os.path.join(path, filename)):
+            if (path / filename).exists():
                 self.path = path
                 break
         else:
             self.path = None
         self.filename = filename
         self.flags = 'r'
-    
+
     def __iter__(self):
         for path in self.paths:
-            yield os.path.join(path, self.filename)
-    
+            yield path / self.filename
+
     def __str__(self):
-        return ':'.join(os.path.join(path, self.filename) for path in self.paths)
-    
+        return ':'.join(str(path / self.filename) for path in self.paths)
+
     def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False, default=None):
         """Return a lazyjson object representing the file(s). Requires the lazyjson module.
-        
+
         Optional arguments:
         existing_only -- If true, exclude files from the multifile which don't exist at the time of the call. Defaults to False.
         readable_only -- If true, exclude files from the multifile for which opening in read mode fails at the time of the call. Defaults to False.
         writeable_only -- If true, exclude files from the multifile for which opening in write mode fails at the time of the call. Defaults to False.
         default -- A JSON-encodable Python object which is appended to the end of the multifile as a lazyjson.PythonFile, and can be used to provide default values for config files. Defaults to None.
-        
+
         Returns:
         A lazyjson.MultiFile created from the paths of this file.
-        
+
         Raises:
         ImportError for lazyjson.
         """
         import lazyjson
-        
+
         paths = []
         for path in self.paths:
-            if existing_only and not os.path.exists(os.path.join(path, self.filename)):
+            if existing_only and not (path / self.filename).exists():
                 continue
             if readable_only:
                 try:
-                    open(os.path.join(path, self.filename)).close()
+                    (path / self.filename).open().close()
                 except IOError:
                     continue
             if writeable_only:
                 try:
-                    open(os.path.join(path, self.filename), 'a').close()
+                    (path / self.filename).open('a').close()
                 except IOError:
                     continue
-            paths.append(os.path.join(path, self.filename))
+            paths.append(path / self.filename)
         paths.append(lazyjson.PythonFile(default))
         return lazyjson.MultiFile(*paths)
-    
+
     def json(self, base=None):
         def _patch_json(base, new):
             new_json = json.load(new)
@@ -109,66 +105,66 @@ class BaseDirFile:
                 return base + new_json
             else:
                 return new_json
-        
+
         return self.read(patch=_patch_json, base=base)
-    
+
     def read(self, patch=None, base=None):
         """If patch is None (the default), this returns the contents of the first found file.
-        
+
         If patch is not None, it must be a function of the form patch(base, new). This function will then read all existing files in reverse order, and call the patch function with the results of the last call as the first argument, and a file object representing the current file as the second argument. The end result is returned.
         """
         if patch is None:
             for path in self.paths:
-                if os.path.exists(os.path.join(path, self.filename)):
-                    with open(os.path.join(path, self.filename)) as f:
+                if (path / self.filename).exists():
+                    with (path / self.filename).open() as f:
                         return f.read()
         else:
             for path in reversed(self.paths):
-                if os.path.exists(os.path.join(path, self.filename)):
-                    with open(os.path.join(path, self.filename)) as new:
+                if (path / self.filename).exists():
+                    with (path / self.filename)open() as new:
                         base = patch(base, new)
             return base
 
 class BaseDir:
     def __call__(self, filename, flags='r'):
         return BaseDirFile([self.path], filename, flags=flags)
-    
+
     def __init__(self, envar, default):
-        self.path = os.environ.get(envar) or default
-    
+        self.path = pathlib.Path(os.environ.get(envar) or default)
+
     def __str__(self):
-        return self.path
-    
+        return str(self.path)
+
     def config(self, filename):
         return Config(self(filename))
 
 class BaseDirs:
     def __call__(self, filename, flags='r'):
         return BaseDirFile([self.home] + self.paths, filename, flags=flags)
-    
+
     def __init__(self, envar, default, home):
         if isinstance(home, BaseDir):
             self.home = home.path
         else:
-            self.home = home
+            self.home = pathlib.Path(home)
         self.paths = os.environ.get(envar) or default
         if isinstance(self.paths, str):
-            self.paths = self.paths.split(':')
-    
+            self.paths = [pathlib.Path(p) for p in self.paths.split(':')]
+
     def __iter__(self):
-        yield str(self.home)
+        yield self.home
         for path in self.paths:
             yield path
-    
+
     def __str__(self, include_home=False):
-        paths = ([str(self.home)] if include_home else []) + list(self.paths)
-        return ':'.join(paths)
-    
+        paths = ([self.home] if include_home else []) + list(self.paths)
+        return ':'.join(str(p) for p in paths)
+
     def config(self, filename):
         return Config(self(filename))
 
-data_home = BaseDir('XDG_DATA_HOME', os.path.join(os.environ['HOME'], '.local/share'))
-config_home = BaseDir('XDG_CONFIG_HOME', os.path.join(os.environ['HOME'], '.config'))
+data_home = BaseDir('XDG_DATA_HOME', pathlib.Path.home() / '.local' / 'share')
+config_home = BaseDir('XDG_CONFIG_HOME', pathlib.Path.home() / '.config')
 data_dirs = BaseDirs('XDG_DATA_DIRS', ['/usr/local/share', '/usr/share'], data_home)
 config_dirs = BaseDirs('XDG_CONFIG_DIRS', ['/etc/xdg'], config_home)
-cache_home = BaseDir('XDG_CACHE_HOME', os.path.join(os.environ['HOME'], '.cache'))
+cache_home = BaseDir('XDG_CACHE_HOME', pathlib.Path.home() / '.cache')
