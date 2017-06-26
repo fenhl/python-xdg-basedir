@@ -121,7 +121,7 @@ class BaseDirFile:
         else:
             for path in reversed(self.paths):
                 if (path / self.filename).exists():
-                    with (path / self.filename)open() as new:
+                    with (path / self.filename).open() as new:
                         base = patch(base, new)
             return base
 
