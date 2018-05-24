@@ -56,7 +56,7 @@ class BaseDirFile:
     def __str__(self):
         return ':'.join(str(path / self.filename) for path in self.paths)
 
-    def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False, default=None):
+    def lazy_json(self, existing_only=False, readable_only=False, writeable_only=False, default=None, *, init=False):
         """Return a lazyjson object representing the file(s). Requires the lazyjson module.
 
         Optional arguments:
@@ -64,6 +64,9 @@ class BaseDirFile:
         readable_only -- If true, exclude files from the multifile for which opening in read mode fails at the time of the call. Defaults to False.
         writeable_only -- If true, exclude files from the multifile for which opening in write mode fails at the time of the call. Defaults to False.
         default -- A JSON-encodable Python object which is appended to the end of the multifile as a lazyjson.PythonFile, and can be used to provide default values for config files. Defaults to None.
+
+        Keyword-only arguments:
+        init -- If true, create the file on the first path if none of the files exists, and write the “default” argument to it. Defaults to False.
 
         Returns:
         A lazyjson.MultiFile created from the paths of this file.
@@ -88,6 +91,16 @@ class BaseDirFile:
                 except IOError:
                     continue
             paths.append(path / self.filename)
+        if init and not any((path / self.filename).exists() for path in self.paths):
+            for path in self.paths:
+                try:
+                    with (path / self.filename).open('w') as f:
+                        json.dump(default, f, indent=4, sort_keys=True)
+                        print(file=f)
+                except IOError:
+                    continue
+                else:
+                    break
         paths.append(lazyjson.PythonFile(default))
         return lazyjson.MultiFile(*paths)
 
