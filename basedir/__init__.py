@@ -128,7 +128,7 @@ class BaseDirFile(collections.abc.Sequence):
     @property
     def path(self):
         for iter_path in self.paths:
-            if (iter_path / filename).exists():
+            if (iter_path / self.filename).exists():
                 return iter_path
 
     def read(self, patch=None, base=None):
