@@ -29,7 +29,7 @@ class BaseDirFile(collections.abc.Sequence):
         self.filename = filename
         self.flags = 'r'
 
-        def __enter__(self):
+    def __enter__(self):
         self.fobj = (self.path / self.filename).open(self.flags)
         return self.fobj
 
