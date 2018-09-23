@@ -1,3 +1,4 @@
+import collections.abc
 import json
 import os
 import os.path
@@ -22,8 +23,13 @@ def parse_version_string():
 
 __version__ = parse_version_string()
 
-class BaseDirFile:
-    def __enter__(self):
+class BaseDirFile(collections.abc.Sequence):
+    def __init__(self, paths, filename, flags='r'):
+        self.paths = [pathlib.Path(p) for p in paths]
+        self.filename = filename
+        self.flags = 'r'
+
+        def __enter__(self):
         self.fobj = (self.path / self.filename).open(self.flags)
         return self.fobj
 
@@ -38,20 +44,18 @@ class BaseDirFile:
                 pass
             return False
 
-    def __init__(self, paths, filename, flags='r'):
-        self.paths = [pathlib.Path(p) for p in paths]
-        for path in self.paths:
-            if (path / filename).exists():
-                self.path = path
-                break
+    def __getitem__(self, value):
+        if isinstance(value, slice):
+            return [path / self.filename for path in self.paths[value]]
         else:
-            self.path = None
-        self.filename = filename
-        self.flags = 'r'
-
+            return self.paths[value] / self.filename
+        
     def __iter__(self):
         for path in self.paths:
             yield path / self.filename
+
+    def __len__(self):
+        return len(self.paths)
 
     def __str__(self):
         return ':'.join(str(path / self.filename) for path in self.paths)
@@ -120,6 +124,12 @@ class BaseDirFile:
                 return new_json
 
         return self.read(patch=_patch_json, base=base)
+
+    @property
+    def path(self):
+        for iter_path in self.paths:
+            if (iter_path / filename).exists():
+                return iter_path
 
     def read(self, patch=None, base=None):
         """If patch is None (the default), this returns the contents of the first found file.
