@@ -49,7 +49,7 @@ class BaseDirFile(collections.abc.Sequence):
             return [path / self.filename for path in self.paths[value]]
         else:
             return self.paths[value] / self.filename
-        
+
     def __iter__(self):
         for path in self.paths:
             yield path / self.filename
@@ -109,7 +109,7 @@ class BaseDirFile(collections.abc.Sequence):
         return lazyjson.MultiFile(*paths)
 
     def json(self, base=None):
-        def _patch_json(base, new):
+        def patch_json(base, new):
             new_json = json.load(new)
             if type(new_json) is dict:
                 if type(base) is not dict:
@@ -123,7 +123,24 @@ class BaseDirFile(collections.abc.Sequence):
             else:
                 return new_json
 
-        return self.read(patch=_patch_json, base=base)
+        return self.read(patch=patch_json, base=base)
+
+    async def json_async(self, base=None):
+        async def patch_json_async(base, new):
+            new_json = json.loads(await new.read())
+            if type(new_json) is dict:
+                if type(base) is not dict:
+                    return new_json
+                base.update(new_json)
+                return base
+            elif type(new_json) is list:
+                if type(base) is not list:
+                    return new_json
+                return base + new_json
+            else:
+                return new_json
+
+        return await self.read_async(patch=patch_json_async, base=base)
 
     @property
     def path(self):
@@ -136,6 +153,7 @@ class BaseDirFile(collections.abc.Sequence):
 
         If patch is not None, it must be a function of the form patch(base, new). This function will then read all existing files in reverse order, and call the patch function with the results of the last call as the first argument, and a file object representing the current file as the second argument. The end result is returned.
         """
+
         if patch is None:
             for path in self.paths:
                 if (path / self.filename).exists():
@@ -146,6 +164,26 @@ class BaseDirFile(collections.abc.Sequence):
                 if (path / self.filename).exists():
                     with (path / self.filename).open() as new:
                         base = patch(base, new)
+            return base
+
+    async def read_async(self, patch=None, base=None):
+        """If patch is None (the default), this returns the contents of the first found file.
+
+        If patch is not None, it must be a coroutine of the form patch(base, new). This coroutine will then read all existing files in reverse order, and call the patch coroutine with the results of the last call as the first argument, and an aiofiles async file object representing the current file as the second argument. The end result is returned.
+        """
+
+        import aiofiles
+
+        if patch is None:
+            for path in self.paths:
+                if (path / self.filename).exists():
+                    async with aiofiles.open(path / self.filename) as f:
+                        return await f.read()
+        else:
+            for path in reversed(self.paths):
+                if (path / self.filename).exists():
+                    async with aiofiles.open(path / self.filename) as new:
+                        base = await patch(base, new)
             return base
 
 class BaseDir:

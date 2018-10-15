@@ -2,8 +2,8 @@
 
 This is `python-xdg-basedir` version 0.15.0 ([semver](http://semver.org/)).
 
-Requirements
-============
+# Requirements
 
-*   Python 3.5
-*   For the `lazy_json` functionality, [lazyjson](https://github.com/fenhl/lazyjson) 2
+* Python 3.5
+* For the `lazy_json` functionality, [lazyjson](https://github.com/fenhl/lazyjson) 2
+* For the `json_async` and `read_async` functionality, [aiofiles](https://pypi.org/project/aiofiles/)
