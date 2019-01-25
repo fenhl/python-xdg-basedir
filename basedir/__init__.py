@@ -80,6 +80,17 @@ class BaseDirFile(collections.abc.Sequence):
         """
         import lazyjson
 
+        if init and not any((path / self.filename).exists() for path in self.paths):
+            for path in self.paths:
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                    with (path / self.filename).open('w') as f:
+                        json.dump(default, f, indent=4, sort_keys=True)
+                        print(file=f)
+                except IOError:
+                    continue
+                else:
+                    break
         paths = []
         for path in self.paths:
             if existing_only and not (path / self.filename).exists():
@@ -95,17 +106,6 @@ class BaseDirFile(collections.abc.Sequence):
                 except IOError:
                     continue
             paths.append(path / self.filename)
-        if init and not any((path / self.filename).exists() for path in self.paths):
-            for path in self.paths:
-                try:
-                    path.mkdir(parents=True, exist_ok=True)
-                    with (path / self.filename).open('w') as f:
-                        json.dump(default, f, indent=4, sort_keys=True)
-                        print(file=f)
-                except IOError:
-                    continue
-                else:
-                    break
         paths.append(lazyjson.PythonFile(default))
         return lazyjson.MultiFile(*paths)
 
