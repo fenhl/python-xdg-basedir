@@ -98,6 +98,7 @@ class BaseDirFile(collections.abc.Sequence):
         if init and not any((path / self.filename).exists() for path in self.paths):
             for path in self.paths:
                 try:
+                    path.mkdir(parents=True, exist_ok=True)
                     with (path / self.filename).open('w') as f:
                         json.dump(default, f, indent=4, sort_keys=True)
                         print(file=f)
