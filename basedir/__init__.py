@@ -1,9 +1,27 @@
 import collections.abc
-import json
 import os
 import os.path
 import pathlib
 import subprocess
+
+try:
+    import simplejson
+except ImportError:
+    import json
+
+    class DecimalEncoder(json.JSONEncoder): #FROM http://stackoverflow.com/a/3885198/667338
+        def default(self, o):
+            if isinstance(o, decimal.Decimal):
+                return float(o) # do not use str as that would enclose the value in quotes
+            return super().default(o)
+
+    json_dump = lambda o, f: json.dump(o, f, indent=4, sort_keys=True, cls=DecimalEncoder)
+    json_load = lambda f: json.load(f, parse_float=decimal.Decimal)
+    json_loads = lambda s: json.loads(s, parse_float=decimal.Decimal)
+else:
+    json_dump = lambda o, f: simplejson.dump(o, f, indent=4, sort_keys=True)
+    json_load = lambda f: simplejson.load(f, use_decimal=True)
+    json_loads = lambda s: simplejson.loads(s, use_decimal=True)
 
 def parse_version_string():
     path = pathlib.Path(__file__).resolve().parent # go up one level, from repo/basedir.py to repo, where README.md is located
@@ -85,7 +103,7 @@ class BaseDirFile(collections.abc.Sequence):
                 try:
                     path.mkdir(parents=True, exist_ok=True)
                     with (path / self.filename).open('w') as f:
-                        json.dump(default, f, indent=4, sort_keys=True)
+                        json_dump(default, f)
                         print(file=f)
                 except IOError:
                     continue
@@ -111,7 +129,7 @@ class BaseDirFile(collections.abc.Sequence):
 
     def json(self, base=None):
         def patch_json(base, new):
-            new_json = json.load(new)
+            new_json = json_load(new)
             if type(new_json) is dict:
                 if type(base) is not dict:
                     return new_json
@@ -128,7 +146,7 @@ class BaseDirFile(collections.abc.Sequence):
 
     async def json_async(self, base=None):
         async def patch_json_async(base, new):
-            new_json = json.loads(await new.read())
+            new_json = json_loads(await new.read())
             if type(new_json) is dict:
                 if type(base) is not dict:
                     return new_json
